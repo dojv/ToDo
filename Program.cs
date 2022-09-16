@@ -4,7 +4,7 @@ using ToDo;
 User user = new User();
 Functions func = new Functions();
 
-Load(user);
+//Load(user);
 if (String.IsNullOrEmpty(user.Name)) { GetName(user, func); }
 if (user.Projects.Count() == 0) { AskForAutoFill(user, func); }
 MainMenu(user, func);
@@ -40,7 +40,7 @@ static void MainMenu(User user, Functions func)
         //sorting by date or alphabetical (toggle)
         else if (input.ToUpper() == "S" && !projectsDateSorted)
         {
-            user.Projects.Sort((a, b) => a.DueDate.CompareTo(b.DueDate));
+            user.Projects.Sort((a, b) => a.DueDate.CompareTo(b.DueDate)); //why not just orderby? 
             projectsDateSorted = true;
             continue;
         }
@@ -87,21 +87,19 @@ static void PrintProjects(User user, Functions func, bool projectsDateSorted)
 {
     Console.Clear();
     Console.WriteLine("-PROJECTS-");
-    Console.WriteLine("Input corresponding number to view and edit your project, or choose from the menu with letters. \n");
+    Console.WriteLine();
 
     int counter = 1;
     foreach (Project project in user.Projects)
     {
-        //var diff = project.DueDate - DateTime.Today;
-        //DateTime limit = DateTime.Today.AddDays(30);
-        //if (diff < limit) { func.Yellow() }
 
         //coloring projects by date or status
+        //should use TimeSpan really
         if (project.Status) { func.Green(); }
-        else if ((project.DueDate - DateTime.Today).TotalDays < 30) { func.Red(); } //https://stackoverflow.com/questions/528368/datetime-compare-how-to-check-if-a-date-is-less-than-30-days-old
+        else if ((project.DueDate - DateTime.Today).TotalDays < 30) { func.Red(); } 
         else if ((project.DueDate - DateTime.Today).TotalDays < 60) { func.Yellow(); }
         
-        if (String.IsNullOrEmpty(project.CompletedWhen))
+        if (String.IsNullOrEmpty(project.CompletedWhen)) //only has a value when completed
         {
             Console.WriteLine($"'{counter}' {project.Title}".PadRight(35) + $"| due: {project.DueDate.ToString("dd/MM-yyyy")}");
         }
@@ -122,6 +120,7 @@ static void PrintProjects(User user, Functions func, bool projectsDateSorted)
     Console.WriteLine("'M' to Mark a project as 'completed' (or back to 'not completed')");
     Console.WriteLine("'Q' to Quit program (and save data)");
     Console.WriteLine();
+    Console.WriteLine("Input corresponding number to view and edit your project, or choose from the menu with letters.");
 }
 
 static User CreateProject(User user, Functions func)
@@ -243,19 +242,19 @@ static User ChangeProjectStatus(User user, Functions func)
             func.Red();
             continue;
         }
-        else if (menuChoice <= user.Projects.Count() && menuChoice > 0)
+        else if (menuChoice <= user.Projects.Count() && menuChoice > 0) //allowing only numbers shown on screen
         {
             func.Green();
             if (!user.Projects[menuChoice - 1].Status)
             {
                 user.Projects[menuChoice - 1].Status = true;
-                user.Projects[menuChoice - 1].CompletedWhen = DateTime.Now.ToString("dd/MM-yyyy, HH:mm:ss");
+                user.Projects[menuChoice - 1].CompletedWhen = DateTime.Now.ToString("dd/MM-yyyy, HH:mm:ss"); //saves the now time in a string
                 Console.WriteLine($"'{user.Projects[menuChoice - 1].Title}' is now marked as 'completed', congratulations!");
             }
             else
             {
                 user.Projects[menuChoice - 1].Status = false;
-                user.Projects[menuChoice - 1].CompletedWhen = "";
+                user.Projects[menuChoice - 1].CompletedWhen = ""; //back to empty
                 Console.WriteLine($"'{user.Projects[menuChoice - 1].Title}' is now marked as 'not completed', aaww....");
             }
             func.Reset();
@@ -487,7 +486,7 @@ static User ChangeTaskStatus(User user, Functions func, int chosenProjectIndex)
         }
         Console.WriteLine("Please input the corresponding number for the task you wish to change status on. ('Q' to cancel)");
         string input = func.CheckNullOrEmpty(func);
-        if (input.ToUpper() == "Q") { break; }
+        if (input.ToUpper() == "Q") { break; } 
 
         bool isInt = int.TryParse(input, out int menuChoice);
         if (!isInt)
@@ -526,12 +525,101 @@ static User ChangeTaskStatus(User user, Functions func, int chosenProjectIndex)
 
 static User Save(User user)
 {
-    //empty so far
+    StreamWriter write = new StreamWriter("data.txt");
+    write.WriteLine(user.Name);
+
+    int nrOfProjects = user.Projects.Count();
+    write.WriteLine(nrOfProjects.ToString()); //uses this to know number of loops when loading projects
+
+    for (int i = 0; i < nrOfProjects; i++)
+    {
+        string stringBuilder = String.Concat
+        (
+            user.Projects[i].Title + "§" +
+            user.Projects[i].DueDate.ToString("dd/MM-yyyy, HH:mm:ss") + "§" +
+            user.Projects[i].Status.ToString()
+        );
+        if (user.Projects[i].Status) //if true .CompletedWhen is not empty
+        {
+            stringBuilder += String.Concat("§" + user.Projects[i].CompletedWhen);
+        }
+        write.WriteLine(stringBuilder); //first project converted to 1 string, with §-seperator
+        int nrOfTasks = user.Projects[i].Tasks.Count(); 
+        write.WriteLine(nrOfTasks.ToString()); //uses this to know number of loops when loading tasks
+
+        for (int j = 0; j < nrOfTasks; j++)
+        {
+            string stringBuilder2 = String.Concat
+                (
+                    user.Projects[i].Tasks[j].Title + "§" +
+                    user.Projects[i].Tasks[j].DueDate.ToString("dd/MM-yyyy, HH:mm:ss") + "§" +
+                    user.Projects[i].Tasks[j].Status.ToString()
+                );
+            if (user.Projects[i].Tasks[j].Status) //if true .CompletedWhen is not empty
+            {
+                stringBuilder2 += String.Concat("§" + user.Projects[i].Tasks[j].CompletedWhen);
+            }
+            write.WriteLine(stringBuilder2); //converts all tasks to strings for each project with §-seperator
+        }
+    }
+
+    string stringBuilder3 = "";
+    foreach (string project in user.randomProjects) //remaining projects for the ProjectTemplate() or AutoFill()
+    {
+        stringBuilder3 += String.Concat(project + "§");
+    }
+    write.WriteLine(stringBuilder3.Remove(stringBuilder3.Length -1, 1)); //removes last char '§'
+
+    write.Close();
     return user;
 }
 
 static User Load(User user)
 {
-    //empty so far
+    StreamReader read = new StreamReader("data.txt");
+    user.Name = read.ReadLine(); //name is first line
+
+    int nrOfProjects = Convert.ToInt32(read.ReadLine()); //to know nr of loops for the projects
+
+    for (int i = 0; i < nrOfProjects; i++)
+    {
+        string[] dataSplitter = read.ReadLine().Split("§"); //splitting by §-seperator to handle the data
+
+        Project temp = new Project();
+        temp.Title = dataSplitter[0];
+        temp.DueDate = Convert.ToDateTime(dataSplitter[1]);
+        temp.Status = Convert.ToBoolean(dataSplitter[2]);
+        if (dataSplitter.Length == 4) //if length is 4 then .Status is true, and have 1 more datapoint
+        {
+            temp.CompletedWhen = dataSplitter[3];
+        }
+        user.Projects.Add(temp); //adds project, can now add the tasks for that project
+        int nrOfTasks = Convert.ToInt32(read.ReadLine()); //nr of loops == number of tasks
+
+        for (int j = 0; j < nrOfTasks; j++)
+        {
+            string[] dataSplitter2 = read.ReadLine().Split("§");
+
+            ToDo.Task temp2 = new ToDo.Task();
+            temp2.Title = dataSplitter2[0];
+            temp2.DueDate = Convert.ToDateTime(dataSplitter2[1]);
+            temp2.Status = Convert.ToBoolean(dataSplitter2[2]);
+            if (dataSplitter2.Length == 4) //if 4 then .Status is true and we want the completed date
+            {
+                temp2.CompletedWhen = dataSplitter2[3];
+            }
+            temp2.Project = user.Projects[i];
+            user.Projects[i].Tasks.Add(temp2);
+        }
+    }
+
+    string[] dataSplitter3 = read.ReadLine().Split("§"); //only the remaining projectsnames for ProjectTemplate() and AutoFill()
+    user.randomProjects.Clear(); //clears this to avoid duplicates
+    foreach (string randomProject in dataSplitter3)
+    {
+        user.randomProjects.Add(randomProject);
+    }
+
+    read.Close();
     return user;
 }
